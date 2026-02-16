@@ -8,11 +8,13 @@ import {
     SafeAreaView,
     Platform,
     TextInput,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RootStackParamList } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 type QuestionsScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'Questions'>;
@@ -24,6 +26,7 @@ type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_activ
 type AgeRange = '18-24' | '25-34' | '35-44' | '45-54' | '55+' | null;
 
 export default function QuestionsScreen({ navigation }: QuestionsScreenProps) {
+    const { completeOnboarding } = useAuth();
     const [currentStep, setCurrentStep] = useState(1);
     const [gender, setGender] = useState<Gender>(null);
     const [goal, setGoal] = useState<Goal>(null);
@@ -31,6 +34,7 @@ export default function QuestionsScreen({ navigation }: QuestionsScreenProps) {
     const [ageRange, setAgeRange] = useState<AgeRange>(null);
     const [height, setHeight] = useState('');
     const [weight, setWeight] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
     const totalSteps = 6;
 
@@ -49,23 +53,24 @@ export default function QuestionsScreen({ navigation }: QuestionsScreenProps) {
     };
 
     const saveAnswers = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
         try {
-            const userData = {
-                gender,
-                goal,
-                activityLevel,
-                ageRange,
-                height: height ? parseInt(height) : null,
-                weight: weight ? parseFloat(weight) : null,
-                completedAt: new Date().toISOString(),
-            };
-
-            await AsyncStorage.setItem('userProfile', JSON.stringify(userData));
-            await AsyncStorage.setItem('questionsCompleted', 'true');
-
-            navigation.replace('Onboarding');
-        } catch (error) {
+            await completeOnboarding({
+                gender: gender!,
+                goal: goal!,
+                activityLevel: activityLevel!,
+                ageRange: ageRange!,
+                height: parseInt(height),
+                weight: parseFloat(weight),
+            });
+            // completeOnboarding sets state.user in AuthContext,
+            // which automatically switches the navigator to the Home stack.
+            // No manual navigation needed!
+        } catch (error: any) {
             console.error('Erro ao salvar respostas:', error);
+            Alert.alert('Erro', 'Não foi possível salvar seus dados. Tente novamente.');
+            setIsSaving(false);
         }
     };
 

@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../types';
 
 type CameraScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'Camera'>;

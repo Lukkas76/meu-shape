@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ────────────────────────────────────────────────────────
+    // FUNÇÕES AUXILIARES
+    // ────────────────────────────────────────────────────────
+
+    // Verifica se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifica se o usuário é dono do documento
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Valida que o campo uid do documento pertence ao usuário autenticado
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    // Valida que o novo documento tem o uid correto
+    function hasValidUid() {
+      return request.resource.data.uid == request.auth.uid;
+    }
+
+    // Valida campos obrigatórios de perfil
+    function isValidProfile() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['uid', 'email', 'gender', 'goal', 'activityLevel', 'ageRange', 'height', 'weight'])
+        && data.gender in ['male', 'female', 'other']
+        && data.goal in ['weight_loss', 'muscle_gain', 'maintenance', 'health']
+        && data.activityLevel in ['sedentary', 'light', 'moderate', 'active', 'very_active']
+        && data.ageRange in ['18-24', '25-34', '35-44', '45-54', '55+']
+        && data.height is number && data.height >= 100 && data.height <= 250
+        && data.weight is number && data.weight >= 30 && data.weight <= 300;
+    }
+
+    // Valida campos de medição
+    function isValidMeasurement() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['uid', 'chest', 'waist', 'hip', 'arm', 'leg', 'bodyFat', 'height', 'date'])
+        && data.chest is number && data.chest > 0 && data.chest < 200
+        && data.waist is number && data.waist > 0 && data.waist < 200
+        && data.hip is number && data.hip > 0 && data.hip < 200
+        && data.arm is number && data.arm > 0 && data.arm < 100
+        && data.leg is number && data.leg > 0 && data.leg < 150
+        && data.bodyFat is number && data.bodyFat >= 0 && data.bodyFat <= 60
+        && data.height is number && data.height >= 100 && data.height <= 250;
+    }
+
+    // ────────────────────────────────────────────────────────
+    // REGRAS: PERFIS DE USUÁRIO
+    // ────────────────────────────────────────────────────────
+
+    match /users/{userId} {
+      // Leitura: apenas o próprio usuário
+      allow read: if isOwner(userId);
+
+      // Criação: apenas para si mesmo, com dados válidos
+      allow create: if isOwner(userId) && isValidProfile();
+
+      // Atualização: apenas o próprio, não pode alterar uid/email/createdAt
+      allow update: if isOwner(userId)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'email', 'createdAt']));
+
+      // Deleção: apenas o próprio usuário
+      allow delete: if isOwner(userId);
+    }
+
+    // ────────────────────────────────────────────────────────
+    // REGRAS: MEDIÇÕES CORPORAIS
+    // ────────────────────────────────────────────────────────
+
+    match /measurements/{measurementId} {
+      // Leitura: apenas medições do próprio usuário
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+
+      // Criação: apenas para si mesmo, com dados válidos
+      allow create: if isAuthenticated() && hasValidUid() && isValidMeasurement();
+
+      // Atualização: não permitida (medições são imutáveis)
+      allow update: if false;
+
+      // Deleção: apenas o dono da medição
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // ────────────────────────────────────────────────────────
+    // REGRA PADRÃO: NEGAR TUDO
+    // ────────────────────────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

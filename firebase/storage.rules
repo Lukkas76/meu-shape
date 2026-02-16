@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ────────────────────────────────────────────────────────
+    // FUNÇÕES AUXILIARES
+    // ────────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Valida que é uma imagem (JPEG/PNG)
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // Limita tamanho do arquivo (10MB)
+    function isUnderSizeLimit() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // ────────────────────────────────────────────────────────
+    // REGRAS: FOTOS DO USUÁRIO
+    // ────────────────────────────────────────────────────────
+
+    match /users/{userId}/{allPaths=**} {
+      // Leitura: apenas o próprio usuário
+      allow read: if isOwner(userId);
+
+      // Upload: apenas o próprio, deve ser imagem < 10MB
+      allow write: if isOwner(userId) && isImage() && isUnderSizeLimit();
+
+      // Deleção: apenas o próprio usuário
+      allow delete: if isOwner(userId);
+    }
+
+    // ────────────────────────────────────────────────────────
+    // REGRA PADRÃO: NEGAR TUDO
+    // ────────────────────────────────────────────────────────
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

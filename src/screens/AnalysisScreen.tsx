@@ -10,7 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../types';
 import BodyAnalysisService, { BodyMeasurements } from '../services/BodyAnalysisService';
 
 type AnalysisScreenProps = {
